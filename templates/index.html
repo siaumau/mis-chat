@@ -126,6 +126,12 @@
                 <label for="modelSelect" class="text-sm text-gray-600">選擇模型：</label>
                 <select id="modelSelect" class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-gray-400">
                 </select>
+                <button id="saveModelPreference" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md border border-gray-300">
+                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    設為預設
+                </button>
             </div>
         </div>
 
@@ -224,23 +230,48 @@
             chatTitle.textContent = `${displayName} 對話助手`;
         }
 
+        // 保存模型偏好
+        function saveModelPreference(modelName) {
+            localStorage.setItem('preferredModel', modelName);
+            // 顯示提示訊息
+            const button = document.getElementById('saveModelPreference');
+            const originalText = button.innerHTML;
+            button.innerHTML = `
+                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                已設定
+            `;
+            button.classList.remove('bg-gray-100', 'hover:bg-gray-200');
+            button.classList.add('bg-green-100', 'text-green-700');
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('bg-green-100', 'text-green-700');
+                button.classList.add('bg-gray-100', 'hover:bg-gray-200');
+            }, 2000);
+        }
+
         // 載入可用模型列表
         async function loadModels() {
             try {
                 const response = await fetch('/models');
                 const data = await response.json();
                 if (data.models) {
+                    // 獲取保存的偏好模型
+                    const preferredModel = localStorage.getItem('preferredModel');
+
                     modelSelect.innerHTML = data.models
                         .map(model => {
                             const displayName = model.type === 'local' ?
                                 `${model.display_name} (本地)` :
                                 `${model.display_name} (API)`;
-                            return `<option value="${model.name}">${displayName}</option>`;
+                            return `<option value="${model.name}" ${model.name === preferredModel ? 'selected' : ''}>${displayName}</option>`;
                         })
                         .join('');
 
                     // 初始化標題
-                    const selectedModel = data.models[0];
+                    const selectedModel = data.models.find(m => m.name === preferredModel) || data.models[0];
                     updateTitle(selectedModel.name, selectedModel.display_name);
 
                     // 將模型資訊保存在全局變數中
@@ -258,6 +289,12 @@
             if (selectedModel) {
                 updateTitle(selectedModel.name, selectedModel.display_name);
             }
+        });
+
+        // 添加保存偏好按鈕事件監聽器
+        document.getElementById('saveModelPreference').addEventListener('click', () => {
+            const selectedModel = modelSelect.value;
+            saveModelPreference(selectedModel);
         });
 
         // 格式化文本的增強版函數
