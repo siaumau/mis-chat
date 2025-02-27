@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>設定 - AI 對話助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-semibold text-gray-800">設定</h1>
+            <a href="/" class="text-gray-600 hover:text-gray-800">返回聊天</a>
+        </div>
+
+        <!-- 設定標籤 -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <button class="tab-button border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600" 
+                        data-tab="deepseek">
+                    DeepSeek API
+                </button>
+                <button class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300" 
+                        data-tab="anthropic">
+                    Anthropic API
+                </button>
+                <button class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300" 
+                        data-tab="openai">
+                    OpenAI API
+                </button>
+            </nav>
+        </div>
+
+        <!-- DeepSeek API 設定 -->
+        <div id="deepseek-settings" class="tab-content">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API URL</label>
+                        <input type="text" id="deepseek-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API Key</label>
+                        <input type="password" id="deepseek-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">模型名稱</label>
+                        <input type="text" id="deepseek-model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <button onclick="testConnection('deepseek')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                        測試連線
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anthropic API 設定 -->
+        <div id="anthropic-settings" class="tab-content hidden">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API URL</label>
+                        <input type="text" id="anthropic-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API Key</label>
+                        <input type="password" id="anthropic-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">模型名稱</label>
+                        <input type="text" id="anthropic-model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <button onclick="testConnection('anthropic')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                        測試連線
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- OpenAI API 設定 -->
+        <div id="openai-settings" class="tab-content hidden">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API URL</label>
+                        <input type="text" id="openai-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">API Key</label>
+                        <input type="password" id="openai-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">模型名稱</label>
+                        <input type="text" id="openai-model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <button onclick="testConnection('openai')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                        測試連線
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 保存按鈕 -->
+        <div class="mt-6 flex justify-end">
+            <button onclick="saveSettings()" class="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600">
+                保存設定
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 標籤切換功能
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // 移除所有標籤的活動狀態
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'text-blue-600');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                });
+
+                // 設置當前標籤為活動狀態
+                button.classList.remove('border-transparent', 'text-gray-500');
+                button.classList.add('border-blue-500', 'text-blue-600');
+
+                // 隱藏所有內容
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+
+                // 顯示當前標籤的內容
+                document.getElementById(`${button.dataset.tab}-settings`).classList.remove('hidden');
+            });
+        });
+
+        // 載入設定
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                
+                // 載入每個 API 的設定
+                ['deepseek', 'anthropic', 'openai'].forEach(api => {
+                    if (settings[api]) {
+                        document.getElementById(`${api}-url`).value = settings[api].url || '';
+                        document.getElementById(`${api}-key`).value = settings[api].key || '';
+                        document.getElementById(`${api}-model`).value = settings[api].model || '';
+                    }
+                });
+            } catch (error) {
+                console.error('載入設定失敗:', error);
+            }
+        }
+
+        // 保存設定
+        async function saveSettings() {
+            const settings = {};
+            ['deepseek', 'anthropic', 'openai'].forEach(api => {
+                settings[api] = {
+                    url: document.getElementById(`${api}-url`).value,
+                    key: document.getElementById(`${api}-key`).value,
+                    model: document.getElementById(`${api}-model`).value
+                };
+            });
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('設定已保存');
+                } else {
+                    alert('保存失敗: ' + result.error);
+                }
+            } catch (error) {
+                alert('保存失敗: ' + error.message);
+            }
+        }
+
+        // 測試連線
+        async function testConnection(api) {
+            const url = document.getElementById(`${api}-url`).value;
+            const key = document.getElementById(`${api}-key`).value;
+            const model = document.getElementById(`${api}-model`).value;
+
+            try {
+                const response = await fetch('/api/test-model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_type: api,
+                        api_url: url,
+                        api_key: key,
+                        model: model
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('連線測試成功！\n回應: ' + result.response);
+                } else {
+                    alert('連線測試失敗: ' + result.error);
+                }
+            } catch (error) {
+                alert('連線測試失敗: ' + error.message);
+            }
+        }
+
+        // 頁面載入時載入設定
+        loadSettings();
+    </script>
+</body>
+</html>

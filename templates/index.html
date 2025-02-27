@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mistral-7B 對話介面</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 程式碼區塊容器樣式 */
+        .code-block-wrapper {
+            position: relative;
+            margin: 1em 0;
+        }
+
+        /* 複製按鈕樣式 */
+        .copy-code-button {
+            position: absolute;
+            bottom: 0.5rem;
+            right: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        /* 預覽按鈕樣式 */
+        .preview-html-button {
+            position: absolute;
+            bottom: 0.5rem;
+            right: 5rem;  /* 放在複製按鈕左邊 */
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .code-block-wrapper:hover .copy-code-button {
+            opacity: 1;
+        }
+
+        .code-block-wrapper:hover .preview-html-button {
+            opacity: 1;
+        }
+
+        .copy-code-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .preview-html-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 預覽模態框樣式 */
+        .preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .preview-modal-content {
+            position: relative;
+            background-color: white;
+            margin: 2% auto;
+            padding: 20px;
+            width: 90%;
+            height: 90%;
+            border-radius: 8px;
+            overflow: auto;
+        }
+
+        .preview-modal-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .preview-iframe {
+            width: 100%;
+            height: calc(100% - 40px);
+            border: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex">
+    <!-- 側邊欄 -->
+    <div class="w-64 bg-gray-900 text-white p-4 flex flex-col">
+        <!-- 新對話按鈕 -->
+        <button id="newChatBtn" class="w-full bg-white/10 hover:bg-white/20 text-white rounded-md p-3 mb-4 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            新對話
+        </button>
+
+        <!-- 歷史記錄 -->
+        <div class="flex-1 overflow-y-auto" id="historyList">
+            <!-- 歷史記錄會動態添加在這裡 -->
+        </div>
+
+        <!-- 設定按鈕 -->
+        <a href="/settings" class="w-full bg-white/10 hover:bg-white/20 text-white rounded-md p-3 mt-4 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            設定
+        </a>
+    </div>
+
+    <!-- 主要聊天區域 -->
+    <div class="flex-1 flex flex-col h-screen">
+        <!-- 頂部標題 -->
+        <div class="border-b p-4 bg-white flex items-center justify-between">
+            <h1 id="chatTitle" class="text-xl font-semibold text-center text-gray-800">AI 對話助手</h1>
+            <div class="flex items-center space-x-2">
+                <label for="modelSelect" class="text-sm text-gray-600">選擇模型：</label>
+                <select id="modelSelect" class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-gray-400">
+                </select>
+            </div>
+        </div>
+
+        <!-- 聊天記錄區域 -->
+       <div id="chatHistory" class="flex-1 overflow-y-auto  space-y-4 mx-48 p-12">
+
+            <div class="flex items-start space-x-4 justify-start assistant-message">
+                <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                    <div class="prose">您好！我是 AI 助手，有什麼我可以幫您的嗎？</div>
+                    <div class="text-xs text-gray-500 mt-2 text-right"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 輸入區域 -->
+        <div class="border-t bg-white p-4">
+            <div class="max-w-4xl mx-auto">
+                <div class="relative">
+                    <textarea
+                        id="prompt"
+                        class="w-full rounded-lg border border-gray-300 focus:border-gray-500 focus:ring focus:ring-gray-200 p-4 pr-20 resize-none"
+                        placeholder="輸入訊息..."
+                        rows="3"
+                        style="min-height: 60px; max-height: 200px;"
+                    ></textarea>
+                    <button
+                        id="sendBtn"
+                        class="absolute right-2 bottom-2 bg-gray-600 text-white rounded-lg m-2 px-4 py-2 hover:bg-gray-700 transition-colors disabled:bg-gray-400"
+                    >
+                        發送
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    按 Enter 發送，Shift + Enter 換行
+                </p>
+            </div>
+        </div>
+
+        <!-- 載入指示器 -->
+        <div id="loading" class="hidden fixed bottom-24 left-1/2 transform -translate-x-1/2">
+            <div class="bg-black/75 text-white px-4 py-2 rounded-full flex items-center space-x-2">
+                <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                <span>思考中...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 預覽模態框 -->
+    <div id="previewModal" class="preview-modal">
+        <div class="preview-modal-content">
+            <span class="preview-modal-close" onclick="closePreview()">&times;</span>
+            <iframe id="previewFrame" class="preview-iframe"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // 預覽 HTML 代碼
+        function previewHtml(code) {
+            const modal = document.getElementById('previewModal');
+            const iframe = document.getElementById('previewFrame');
+            
+            // 設置 iframe 內容
+            iframe.srcdoc = code;
+            
+            // 顯示模態框
+            modal.style.display = 'block';
+        }
+        
+        // 關閉預覽
+        function closePreview() {
+            const modal = document.getElementById('previewModal');
+            modal.style.display = 'none';
+        }
+        
+        // 點擊模態框外部關閉
+        window.onclick = function(event) {
+            const modal = document.getElementById('previewModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+        
+        const chatHistoryDiv = document.getElementById('chatHistory');
+        const promptInput = document.getElementById('prompt');
+        const sendBtn = document.getElementById('sendBtn');
+        const loading = document.getElementById('loading');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const historyList = document.getElementById('historyList');
+        const modelSelect = document.getElementById('modelSelect');
+        const chatTitle = document.getElementById('chatTitle');
+        let currentChatId = Date.now().toString();
+        let chatHistoryStore = {};
+
+        // 更新標題
+        function updateTitle(modelName, displayName) {
+            chatTitle.textContent = `${displayName} 對話助手`;
+        }
+
+        // 載入可用模型列表
+        async function loadModels() {
+            try {
+                const response = await fetch('/models');
+                const data = await response.json();
+                if (data.models) {
+                    modelSelect.innerHTML = data.models
+                        .map(model => {
+                            const displayName = model.type === 'local' ?
+                                `${model.display_name} (本地)` :
+                                `${model.display_name} (API)`;
+                            return `<option value="${model.name}">${displayName}</option>`;
+                        })
+                        .join('');
+
+                    // 初始化標題
+                    const selectedModel = data.models[0];
+                    updateTitle(selectedModel.name, selectedModel.display_name);
+
+                    // 將模型資訊保存在全局變數中
+                    window.availableModels = data.models;
+                }
+            } catch (error) {
+                console.error('載入模型列表失敗:', error);
+            }
+        }
+
+        // 添加模型選擇事件監聽器
+        modelSelect.addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const selectedModel = window.availableModels.find(m => m.name === e.target.value);
+            if (selectedModel) {
+                updateTitle(selectedModel.name, selectedModel.display_name);
+            }
+        });
+
+        // 格式化文本的增強版函數
+        function formatTableText(text) {
+            // 如果是空字符串，直接返回
+            if (!text || text.trim() === '') return '';
+
+            // 處理換行符轉換為 <br>，避免後續處理干擾
+            text = text.replace(/\r\n/g, '\n');
+
+            // 檢查是否包含程式碼塊
+            if (text.includes('```')) {
+                const parts = text.split(/(```[\s\S]*?```)/g);
+                let formattedText = '';
+
+                for (const part of parts) {
+                    if (part.startsWith('```') && part.endsWith('```')) {
+                        // 提取語言標誌和程式碼內容
+                        const codeBlock = part.slice(3, -3).trim();
+                        const firstLineEnd = codeBlock.indexOf('\n');
+                        let language = '';
+                        let codeContent = codeBlock;
+
+                        if (firstLineEnd !== -1 && !codeBlock.substring(0, firstLineEnd).includes(' ')) {
+                            language = codeBlock.substring(0, firstLineEnd).trim().toLowerCase();
+                            codeContent = codeBlock.substring(firstLineEnd + 1).trim();
+                        }
+
+                        // 支援常見程式語言的高亮格式
+                        const languageClass = {
+                            'html': 'language-html',
+                            'php': 'language-php',
+                            'javascript': 'language-javascript',
+                            'js': 'language-javascript',
+                            'python': 'language-python',
+                            'py': 'language-python',
+                            'css': 'language-css',
+                            'sql': 'language-sql',
+                            'bash': 'language-bash',
+                            'sh': 'language-bash',
+                            'json': 'language-json',
+                            '': 'language-none' // 無指定語言
+                        }[language] || 'language-none';
+
+                        formattedText += `
+                        <div class="my-4">
+                            <div class="code-block-wrapper">
+                                <pre class="bg-gray-800 text-white p-4 rounded-lg overflow-x-auto"><code class="${languageClass}">${escapeHtml(codeContent)}</code></pre>
+                                <button class="copy-code-button" onclick="copyCode(this.parentElement)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                                        <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                                    </svg>
+                                    複製程式碼
+                                </button>
+                                ${language.toLowerCase() === 'html' ? `
+                                <button class="preview-html-button" onclick="previewHtml(\`${escapeHtml(codeContent).replace(/`/g, '\\`')}\`)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
+                                        <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+                                    </svg>
+                                    預覽 HTML
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>`;
+                    } else {
+                        formattedText += formatMarkdownAndTable(part);
+                    }
+                }
+                return formattedText;
+            }
+
+            // 如果沒有程式碼塊，直接處理 Markdown 和表格
+            return formatMarkdownAndTable(text);
+        }
+
+        // 處理 Markdown 和表格的子函數
+        function formatMarkdownAndTable(text) {
+            let result = escapeHtml(text); // 預設轉義 HTML 特殊字符
+
+            // 處理粗體 (**text** 或 __text__)
+            result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                           .replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+            // 處理斜體 (*text* 或 _text_)
+            result = result.replace(/\*(.*?)\*/g, '<em>$1</em>')
+                           .replace(/_(.*?)_/g, '<em>$1</em>');
+
+            // 處理行內程式碼 (`text`)
+            result = result.replace(/`(.*?)`/g, '<code class="bg-gray-200 text-gray-800 px-1 rounded">$1</code>');
+
+            // 處理標題 (# Heading)
+            result = result.replace(/^(#{1,6})\s+(.*?)$/gm, (match, hashes, content) => {
+                const level = hashes.length;
+                return `<h${level} class="text-${6 - level + 1}xl font-bold mt-4 mb-2">${content}</h${level}>`;
+            });
+
+            // 處理無序列表 (- item 或 * item)
+            result = result.replace(/^([-*])\s+(.*)$/gm, '<li class="ml-4 list-disc">$2</li>');
+            if (result.includes('<li')) {
+                result = `<ul>${result}</ul>`;
+            }
+
+            // 處理有序列表 (1. item)
+            result = result.replace(/^(\d+\.)\s+(.*)$/gm, '<li class="ml-4 list-decimal">$2</li>');
+            if (result.match(/<li class="ml-4 list-decimal"/)) {
+                result = `<ol>${result}</ol>`;
+            }
+
+            // 處理表格
+            if (result.includes('|')) {
+                const lines = result.split('\n');
+                let tableHtml = '';
+                let isTable = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('|') && line.endsWith('|')) {
+                        if (!isTable) {
+                            isTable = true;
+                            tableHtml += '<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-gray-300">';
+                        }
+
+                        const cells = line.slice(1, -1).split('|').map(cell => cell.trim());
+                        const isHeaderDivider = cells.every(cell => cell.match(/^[-:]+$/));
+
+                        if (!isHeaderDivider) {
+                            tableHtml += '<tr>';
+                            cells.forEach((cell, index) => {
+                                const tag = (i === 0 && !cells.every(c => c.match(/^[-:]+$/))) ? 'th' : 'td';
+                                tableHtml += `<${tag} class="border border-gray-300 px-4 py-2 text-left">${cell}</${tag}>`;
+                            });
+                            tableHtml += '</tr>';
+                        }
+                    } else if (isTable) {
+                        tableHtml += '</table></div>';
+                        tableHtml += line + '<br>';
+                        isTable = false;
+                    } else {
+                        tableHtml += line + '<br>';
+                    }
+                }
+
+                if (isTable) {
+                    tableHtml += '</table></div>';
+                }
+
+                result = tableHtml;
+            } else {
+                result = result.replace(/\n/g, '<br>');
+            }
+
+            return result;
+        }
+
+        // HTML 特殊字符轉義函數
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // 發送消息函數
+        async function sendMessage() {
+            const promptText = promptInput.value.trim();
+            if (!promptText) return;
+
+            // 獲取當前選擇的模型
+            const selectedModel = modelSelect.value;
+
+            // 生成當前對話的唯一ID
+            const currentMessageId = Date.now().toString();
+
+            // 顯示用戶訊息
+            addMessage(promptText, true);
+            // 添加到歷史記錄
+            addToHistory(promptText);
+            promptInput.value = '';
+            loading.classList.remove('hidden');
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: promptText,
+                        model: selectedModel
+                    })
+                });
+
+                const reader = response.body.getReader();
+                let currentMessage = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = new TextDecoder().decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonResponse = JSON.parse(line.slice(5));
+                                if (jsonResponse.response) {
+                                    currentMessage += jsonResponse.response;
+                                    // 檢查是否已經有這次對話的助手回應
+                                    const currentAssistantMessage = Array.from(chatHistoryDiv.children).find(
+                                        msg => msg.dataset.messageId === currentMessageId
+                                    );
+
+                                    if (currentAssistantMessage) {
+                                        // 更新當前對話的回應
+                                        const contentDiv = currentAssistantMessage.querySelector('.prose');
+                                        contentDiv.innerHTML = formatTableText(currentMessage);
+                                    } else {
+                                        // 創建新的助手回應
+                                        const messageDiv = document.createElement('div');
+                                        messageDiv.className = 'flex items-start space-x-4 justify-start assistant-message';
+                                        messageDiv.dataset.messageId = currentMessageId;
+                                        const content = `
+                                            <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                                                <div class="prose">${formatTableText(currentMessage)}</div>
+                                                <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
+                                            </div>
+                                        `;
+                                        messageDiv.innerHTML = content;
+                                        chatHistoryDiv.appendChild(messageDiv);
+                                    }
+
+                                    // 滾動到底部
+                                    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+                                }
+                            } catch (error) {
+                                console.error('解析回應時出錯:', error);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('發送請求時出錯:', error);
+            } finally {
+                loading.classList.add('hidden');
+                sendBtn.disabled = false;
+                promptInput.focus();
+            }
+        }
+
+        // 事件監聽器
+        sendBtn.addEventListener('click', sendMessage);
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 頁面載入時獲取模型列表
+        loadModels();
+
+        // 格式化時間
+        function formatTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 添加訊息到聊天記錄
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start space-x-4 ${isUser ? 'justify-end user-message' : 'justify-start assistant-message'}`;
+
+            const content = `
+                <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                    <div class="prose">${formatTableText(text)}</div>
+                    <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
+                </div>
+            `;
+
+            messageDiv.innerHTML = content;
+            chatHistoryDiv.appendChild(messageDiv);
+            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+        }
+
+        // 保存當前對話
+        function saveChatHistory() {
+            const messages = chatHistoryDiv.innerHTML;
+            chatHistoryStore[currentChatId] = messages;
+        }
+
+        // 載入特定對話
+        function loadChatHistory(chatId) {
+            if (chatHistoryStore[chatId]) {
+                chatHistoryDiv.innerHTML = chatHistoryStore[chatId];
+                currentChatId = chatId;
+            }
+        }
+
+        // 創建新對話
+        function createNewChat() {
+            // 保存當前對話
+            saveChatHistory();
+
+            // 創建新的對話ID
+            currentChatId = Date.now().toString();
+
+            // 清空聊天區域
+            chatHistoryDiv.innerHTML = `
+                <div class="flex items-start space-x-4 justify-start assistant-message">
+                    <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                        <div class="prose">您好！我是 AI 助手，有什麼我可以幫您的嗎？</div>
+                        <div class="text-xs text-gray-500 mt-2 text-right"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 添加到歷史記錄
+        function addToHistory(text) {
+            const historyItem = document.createElement('div');
+            historyItem.className = 'p-3 hover:bg-white/10 rounded-md cursor-pointer text-sm';
+            historyItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+            historyItem.dataset.chatId = currentChatId;
+
+            // 檢查是否已經存在相同的對話標籤
+            const existingItem = Array.from(historyList.children).find(
+                item => item.dataset.chatId === currentChatId
+            );
+
+            if (existingItem) {
+                // 更新現有標籤的文本
+                existingItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+            } else {
+                // 添加新的對話標籤
+                historyList.insertBefore(historyItem, historyList.firstChild);
+            }
+
+            // 添加點擊事件
+            historyItem.addEventListener('click', () => {
+                saveChatHistory();  // 保存當前對話
+                loadChatHistory(historyItem.dataset.chatId);  // 載入選中的對話
+            });
+        }
+
+        // 修改清除聊天的事件監聽器
+        newChatBtn.addEventListener('click', createNewChat);
+
+        // 複製程式碼函數
+        async function copyCode(wrapper) {
+            const codeElement = wrapper.querySelector('code');
+            try {
+                await navigator.clipboard.writeText(codeElement.textContent);
+                const button = wrapper.querySelector('.copy-code-button');
+                const originalText = button.innerHTML;
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                    </svg>
+                    已複製！
+                `;
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('複製失敗:', err);
+            }
+        }
+    </script>
+</body>
+</html>

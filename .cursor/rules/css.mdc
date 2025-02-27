@@ -1,0 +1,10 @@
+---
+description: 使用到的css要使用tailwindcss的規範
+globs: 
+---
+
+# Your rule content
+
+- 使用到的css要使用tailwindcss的規範
+- 產生檔案的同時，要把需求更新添加至readme.md文件，假如該文件沒有生成就產生它，readme.md文件也都需要使用中文與英文撰寫
+- 每當有請求修改的時候，都要檢視一下把需要修正的部分也添加到readme.md中

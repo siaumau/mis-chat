@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Application specific
+app/
+instance/
+.webassets-cache
+.env
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+
+# Python virtual environment
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
+
+# 配置文件
+config.yaml

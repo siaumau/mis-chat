@@ -1,0 +1,16 @@
+anthropic:
+  key: your-anthropic-key
+  model: claude-3-7-sonnet-20250219
+  url: https://api.anthropic.com
+app:
+  host: 0.0.0.0
+  name: AI Chat
+  port: 8080
+deepseek:
+  key: your-deepseek-key
+  model: deepseek-chat
+  url: https://api.deepseek.com
+openai:
+  key: your-openai-key
+  model: gpt-4
+  url: https://api.openai.com
