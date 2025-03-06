@@ -64,6 +64,8 @@ def chat():
         data = request.json
         prompt = data.get('prompt', '')
         model_name = data.get('model', 'deepseek-chat')
+        # 獲取對話歷史
+        conversation_history = data.get('conversation_history', [])
 
         # 檢查是否是本地模型
         if ':' in model_name:  # Ollama 模型通常包含冒號，如 mistral:7b
@@ -89,12 +91,21 @@ def chat():
                     'Authorization': f'Bearer {api_key}'
                 }
 
+                # 構建完整的消息歷史
+                messages = [{"role": "system", "content": system_prompt}]
+                
+                # 添加之前的對話歷史（最多保留最近的10條消息，避免超出上下文限制）
+                if conversation_history:
+                    # 只保留最近的對話，避免超出上下文限制
+                    recent_history = conversation_history[-10:] if len(conversation_history) > 10 else conversation_history
+                    messages.extend(recent_history)
+                else:
+                    # 如果沒有對話歷史，只添加當前用戶消息
+                    messages.append({"role": "user", "content": prompt})
+
                 payload = {
                     'model': model_name,
-                    'messages': [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
+                    'messages': messages,
                     'stream': True
                 }
 
@@ -117,7 +128,20 @@ def chat():
 
             else:
                 # 本地 Ollama 模型
-                full_prompt = system_prompt + "\n用戶的問題是：" + prompt
+                # 構建包含對話歷史的完整提示
+                full_prompt = system_prompt + "\n\n"
+                
+                # 添加對話歷史
+                if conversation_history:
+                    # 只保留最近的對話，避免超出上下文限制
+                    recent_history = conversation_history[-10:] if len(conversation_history) > 10 else conversation_history
+                    for msg in recent_history:
+                        role = "用戶" if msg["role"] == "user" else "助手"
+                        full_prompt += f"{role}: {msg['content']}\n\n"
+                
+                # 添加當前問題
+                full_prompt += f"用戶: {prompt}\n\n助手: "
+                
                 response = requests.post(
                     'http://localhost:11434/api/generate',
                     json={

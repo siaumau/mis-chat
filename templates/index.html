@@ -224,6 +224,7 @@
         const chatTitle = document.getElementById('chatTitle');
         let currentChatId = Date.now().toString();
         let chatHistoryStore = {};
+        let conversationHistory = [];
 
         // 更新標題
         function updateTitle(modelName, displayName) {
@@ -478,6 +479,13 @@
             addMessage(promptText, true);
             // 添加到歷史記錄
             addToHistory(promptText);
+            
+            // 添加用戶消息到對話歷史
+            conversationHistory.push({
+                role: "user",
+                content: promptText
+            });
+            
             promptInput.value = '';
             loading.classList.remove('hidden');
             sendBtn.disabled = true;
@@ -490,7 +498,8 @@
                     },
                     body: JSON.stringify({
                         prompt: promptText,
-                        model: selectedModel
+                        model: selectedModel,
+                        conversation_history: conversationHistory // 發送完整對話歷史
                     })
                 });
 
@@ -543,6 +552,12 @@
                         }
                     }
                 }
+
+                // 在接收到回應後，將助手回應添加到對話歷史
+                conversationHistory.push({
+                    role: "assistant",
+                    content: currentMessage
+                });
             } catch (error) {
                 console.error('發送請求時出錯:', error);
             } finally {
@@ -590,13 +605,17 @@
         // 保存當前對話
         function saveChatHistory() {
             const messages = chatHistoryDiv.innerHTML;
-            chatHistoryStore[currentChatId] = messages;
+            chatHistoryStore[currentChatId] = {
+                html: messages,
+                history: conversationHistory
+            };
         }
 
         // 載入特定對話
         function loadChatHistory(chatId) {
             if (chatHistoryStore[chatId]) {
-                chatHistoryDiv.innerHTML = chatHistoryStore[chatId];
+                chatHistoryDiv.innerHTML = chatHistoryStore[chatId].html;
+                conversationHistory = chatHistoryStore[chatId].history || [];
                 currentChatId = chatId;
             }
         }
@@ -608,6 +627,9 @@
 
             // 創建新的對話ID
             currentChatId = Date.now().toString();
+            
+            // 重置對話歷史
+            conversationHistory = [];
 
             // 清空聊天區域
             chatHistoryDiv.innerHTML = `
