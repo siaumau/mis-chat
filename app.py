@@ -66,6 +66,8 @@ def chat():
         model_name = data.get('model', 'deepseek-chat')
         # 獲取對話歷史
         conversation_history = data.get('conversation_history', [])
+        # 獲取圖片數據
+        image_data = data.get('image')
 
         # 檢查是否是本地模型
         if ':' in model_name:  # Ollama 模型通常包含冒號，如 mistral:7b
@@ -93,7 +95,7 @@ def chat():
 
                 # 構建完整的消息歷史
                 messages = [{"role": "system", "content": system_prompt}]
-                
+
                 # 添加之前的對話歷史（最多保留最近的10條消息，避免超出上下文限制）
                 if conversation_history:
                     # 只保留最近的對話，避免超出上下文限制
@@ -101,7 +103,10 @@ def chat():
                     messages.extend(recent_history)
                 else:
                     # 如果沒有對話歷史，只添加當前用戶消息
-                    messages.append({"role": "user", "content": prompt})
+                    user_message = {"role": "user", "content": prompt}
+                    if image_data:
+                        user_message["image"] = image_data
+                    messages.append(user_message)
 
                 payload = {
                     'model': model_name,
@@ -130,25 +135,38 @@ def chat():
                 # 本地 Ollama 模型
                 # 構建包含對話歷史的完整提示
                 full_prompt = system_prompt + "\n\n"
-                
+
                 # 添加對話歷史
                 if conversation_history:
                     # 只保留最近的對話，避免超出上下文限制
                     recent_history = conversation_history[-10:] if len(conversation_history) > 10 else conversation_history
                     for msg in recent_history:
                         role = "用戶" if msg["role"] == "user" else "助手"
-                        full_prompt += f"{role}: {msg['content']}\n\n"
-                
+                        content = msg["content"]
+                        if msg["role"] == "user" and "image" in msg:
+                            content = f"[用戶上傳了一張圖片]\n{content}" if content else "[用戶上傳了一張圖片]"
+                        full_prompt += f"{role}: {content}\n\n"
+
                 # 添加當前問題
-                full_prompt += f"用戶: {prompt}\n\n助手: "
-                
+                current_prompt = prompt
+                if image_data:
+                    current_prompt = f"[用戶上傳了一張圖片]\n{current_prompt}" if current_prompt else "[用戶上傳了一張圖片]"
+                full_prompt += f"用戶: {current_prompt}\n\n助手: "
+
+                # 準備 Ollama API 請求
+                ollama_request = {
+                    'model': model_name,
+                    'prompt': full_prompt,
+                    'stream': True
+                }
+
+                # 如果有圖片，添加到請求中
+                if image_data:
+                    ollama_request['images'] = [image_data]
+
                 response = requests.post(
                     'http://localhost:11434/api/generate',
-                    json={
-                        'model': model_name,
-                        'prompt': full_prompt,
-                        'stream': True
-                    },
+                    json=ollama_request,
                     stream=True
                 )
 
@@ -191,7 +209,7 @@ def get_settings():
 def update_settings():
     try:
         new_settings = request.json
-        
+
         # 更新每個 API 的設定
         for api in ['deepseek', 'anthropic', 'openai']:
             if api in new_settings:
@@ -202,15 +220,15 @@ def update_settings():
                     'key': new_settings[api]['key'],
                     'model': new_settings[api]['model']
                 })
-        
+
         # 保存到 config.yaml
         save_config(config)
-        
+
         # 更新全局變量
         global api_key, api_url
         api_key = config.get('deepseek', {}).get('key', '')
         api_url = config.get('deepseek', {}).get('url', '')
-        
+
         return jsonify({'success': True, 'message': '設定已更新'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -223,7 +241,7 @@ def test_model():
         model_name = data['model']
         api_key = data['api_key']
         api_url = data['api_url']
-        
+
         # 根據不同的 API 類型使用不同的請求格式
         if api_type == 'anthropic':
             headers = {
@@ -273,7 +291,7 @@ def test_model():
                 content = result.get('choices', [{}])[0].get('message', {}).get('content')
             else:  # deepseek
                 content = result.get('choices', [{}])[0].get('message', {}).get('content')
-            
+
             if content:
                 return jsonify({
                     'success': True,

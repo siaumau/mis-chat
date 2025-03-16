@@ -150,19 +150,44 @@
         <div class="border-t bg-white p-4">
             <div class="max-w-4xl mx-auto">
                 <div class="relative">
-                    <textarea
-                        id="prompt"
-                        class="w-full rounded-lg border border-gray-300 focus:border-gray-500 focus:ring focus:ring-gray-200 p-4 pr-20 resize-none"
-                        placeholder="輸入訊息..."
-                        rows="3"
-                        style="min-height: 60px; max-height: 200px;"
-                    ></textarea>
-                    <button
-                        id="sendBtn"
-                        class="absolute right-2 bottom-2 bg-gray-600 text-white rounded-lg m-2 px-4 py-2 hover:bg-gray-700 transition-colors disabled:bg-gray-400"
-                    >
-                        發送
-                    </button>
+                    <div class="flex items-start space-x-2">
+                        <!-- 圖片上傳按鈕 -->
+                        <div class="flex-shrink-0">
+                            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                            <button onclick="document.getElementById('imageInput').click()" class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- 文字輸入區域 -->
+                        <div class="flex-grow relative">
+                            <textarea
+                                id="prompt"
+                                class="w-full rounded-lg border border-gray-300 focus:border-gray-500 focus:ring focus:ring-gray-200 p-4 pr-20 resize-none"
+                                placeholder="輸入訊息..."
+                                rows="3"
+                                style="min-height: 60px; max-height: 200px;"
+                            ></textarea>
+                            <button
+                                id="sendBtn"
+                                class="absolute right-2 bottom-2 bg-gray-600 text-white rounded-lg m-2 px-4 py-2 hover:bg-gray-700 transition-colors disabled:bg-gray-400"
+                            >
+                                發送
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 圖片預覽區域 -->
+                    <div id="imagePreview" class="hidden mt-2">
+                        <div class="relative inline-block">
+                            <img id="previewImage" class="max-h-32 rounded-lg" alt="預覽圖片">
+                            <button onclick="removeImage()" class="absolute top-1 right-1 bg-gray-800/50 hover:bg-gray-800 text-white rounded-full p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mt-2 text-center">
                     按 Enter 發送，Shift + Enter 換行
@@ -192,20 +217,20 @@
         function previewHtml(code) {
             const modal = document.getElementById('previewModal');
             const iframe = document.getElementById('previewFrame');
-            
+
             // 設置 iframe 內容
             iframe.srcdoc = code;
-            
+
             // 顯示模態框
             modal.style.display = 'block';
         }
-        
+
         // 關閉預覽
         function closePreview() {
             const modal = document.getElementById('previewModal');
             modal.style.display = 'none';
         }
-        
+
         // 點擊模態框外部關閉
         window.onclick = function(event) {
             const modal = document.getElementById('previewModal');
@@ -213,7 +238,7 @@
                 modal.style.display = 'none';
             }
         }
-        
+
         const chatHistoryDiv = document.getElementById('chatHistory');
         const promptInput = document.getElementById('prompt');
         const sendBtn = document.getElementById('sendBtn');
@@ -225,6 +250,279 @@
         let currentChatId = Date.now().toString();
         let chatHistoryStore = {};
         let conversationHistory = [];
+
+        // 處理圖片上傳
+        let currentImage = null;
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // 儲存完整的 base64 數據用於預覽
+                    const fullBase64 = e.target.result;
+                    // 移除 MIME 類型前綴，只保留實際的 base64 數據
+                    const base64Data = fullBase64.split(',')[1];
+                    currentImage = {
+                        data: base64Data,  // 儲存處理後的 base64 數據
+                        type: file.type,
+                        fullData: fullBase64  // 儲存完整的 base64 數據用於預覽
+                    };
+                    document.getElementById('previewImage').src = fullBase64;
+                    document.getElementById('imagePreview').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            currentImage = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreview').classList.add('hidden');
+        }
+
+        // 修改發送消息函數以支援圖片
+        async function sendMessage() {
+            const promptText = promptInput.value.trim();
+            if (!promptText && !currentImage) return;
+
+            // 獲取當前選擇的模型
+            const selectedModel = modelSelect.value;
+
+            // 生成當前對話的唯一ID
+            const currentMessageId = Date.now().toString();
+
+            // 顯示用戶訊息
+            addMessage(promptText, true, currentImage);
+            // 添加到歷史記錄
+            addToHistory(promptText || '傳送了一張圖片');
+
+            // 添加用戶消息到對話歷史
+            const userMessage = {
+                role: "user",
+                content: promptText
+            };
+            if (currentImage) {
+                userMessage.image = currentImage.data;
+            }
+            conversationHistory.push(userMessage);
+
+            // 準備要發送的數據
+            const requestData = {
+                prompt: promptText,
+                model: selectedModel,
+                conversation_history: conversationHistory
+            };
+
+            // 如果有圖片，添加到請求中
+            if (currentImage) {
+                requestData.image = currentImage.data;
+            }
+
+            promptInput.value = '';
+            removeImage();
+            loading.classList.remove('hidden');
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const reader = response.body.getReader();
+                let currentMessage = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = new TextDecoder().decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonResponse = JSON.parse(line.slice(5));
+                                if (jsonResponse.response) {
+                                    currentMessage += jsonResponse.response;
+                                    // 檢查是否已經有這次對話的助手回應
+                                    const currentAssistantMessage = Array.from(chatHistoryDiv.children).find(
+                                        msg => msg.dataset.messageId === currentMessageId
+                                    );
+
+                                    if (currentAssistantMessage) {
+                                        // 更新當前對話的回應
+                                        const contentDiv = currentAssistantMessage.querySelector('.prose');
+                                        contentDiv.innerHTML = formatTableText(currentMessage);
+                                    } else {
+                                        // 創建新的助手回應
+                                        const messageDiv = document.createElement('div');
+                                        messageDiv.className = 'flex items-start space-x-4 justify-start assistant-message';
+                                        messageDiv.dataset.messageId = currentMessageId;
+                                        const content = `
+                                            <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                                                <div class="prose">${formatTableText(currentMessage)}</div>
+                                                <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
+                                            </div>
+                                        `;
+                                        messageDiv.innerHTML = content;
+                                        chatHistoryDiv.appendChild(messageDiv);
+                                    }
+
+                                    // 滾動到底部
+                                    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+                                }
+                            } catch (error) {
+                                console.error('解析回應時出錯:', error);
+                            }
+                        }
+                    }
+                }
+
+                // 在接收到回應後，將助手回應添加到對話歷史
+                conversationHistory.push({
+                    role: "assistant",
+                    content: currentMessage
+                });
+            } catch (error) {
+                console.error('發送請求時出錯:', error);
+            } finally {
+                loading.classList.add('hidden');
+                sendBtn.disabled = false;
+                promptInput.focus();
+            }
+        }
+
+        // 事件監聽器
+        sendBtn.addEventListener('click', sendMessage);
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 頁面載入時獲取模型列表
+        loadModels();
+
+        // 格式化時間
+        function formatTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 修改添加訊息函數以支援圖片
+        function addMessage(text, isUser = false, image = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start space-x-4 ${isUser ? 'justify-end user-message' : 'justify-start assistant-message'}`;
+
+            let content = `
+                <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                    ${image ? `<img src="${image.fullData}" class="max-w-full rounded-lg mb-2" alt="用戶上傳的圖片">` : ''}
+                    ${text ? `<div class="prose">${formatTableText(text)}</div>` : ''}
+                    <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
+                </div>
+            `;
+
+            messageDiv.innerHTML = content;
+            chatHistoryDiv.appendChild(messageDiv);
+            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+        }
+
+        // 保存當前對話
+        function saveChatHistory() {
+            const messages = chatHistoryDiv.innerHTML;
+            chatHistoryStore[currentChatId] = {
+                html: messages,
+                history: conversationHistory
+            };
+        }
+
+        // 載入特定對話
+        function loadChatHistory(chatId) {
+            if (chatHistoryStore[chatId]) {
+                chatHistoryDiv.innerHTML = chatHistoryStore[chatId].html;
+                conversationHistory = chatHistoryStore[chatId].history || [];
+                currentChatId = chatId;
+            }
+        }
+
+        // 創建新對話
+        function createNewChat() {
+            // 保存當前對話
+            saveChatHistory();
+
+            // 創建新的對話ID
+            currentChatId = Date.now().toString();
+
+            // 重置對話歷史
+            conversationHistory = [];
+
+            // 清空聊天區域
+            chatHistoryDiv.innerHTML = `
+                <div class="flex items-start space-x-4 justify-start assistant-message">
+                    <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
+                        <div class="prose">您好！我是 AI 助手，有什麼我可以幫您的嗎？</div>
+                        <div class="text-xs text-gray-500 mt-2 text-right"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 添加到歷史記錄
+        function addToHistory(text) {
+            const historyItem = document.createElement('div');
+            historyItem.className = 'p-3 hover:bg-white/10 rounded-md cursor-pointer text-sm';
+            historyItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+            historyItem.dataset.chatId = currentChatId;
+
+            // 檢查是否已經存在相同的對話標籤
+            const existingItem = Array.from(historyList.children).find(
+                item => item.dataset.chatId === currentChatId
+            );
+
+            if (existingItem) {
+                // 更新現有標籤的文本
+                existingItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+            } else {
+                // 添加新的對話標籤
+                historyList.insertBefore(historyItem, historyList.firstChild);
+            }
+
+            // 添加點擊事件
+            historyItem.addEventListener('click', () => {
+                saveChatHistory();  // 保存當前對話
+                loadChatHistory(historyItem.dataset.chatId);  // 載入選中的對話
+            });
+        }
+
+        // 修改清除聊天的事件監聽器
+        newChatBtn.addEventListener('click', createNewChat);
+
+        // 複製程式碼函數
+        async function copyCode(wrapper) {
+            const codeElement = wrapper.querySelector('code');
+            try {
+                await navigator.clipboard.writeText(codeElement.textContent);
+                const button = wrapper.querySelector('.copy-code-button');
+                const originalText = button.innerHTML;
+                button.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                    </svg>
+                    已複製！
+                `;
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('複製失敗:', err);
+            }
+        }
 
         // 更新標題
         function updateTitle(modelName, displayName) {
@@ -245,7 +543,7 @@
             `;
             button.classList.remove('bg-gray-100', 'hover:bg-gray-200');
             button.classList.add('bg-green-100', 'text-green-700');
-            
+
             setTimeout(() => {
                 button.innerHTML = originalText;
                 button.classList.remove('bg-green-100', 'text-green-700');
@@ -462,235 +760,6 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
-        }
-
-        // 發送消息函數
-        async function sendMessage() {
-            const promptText = promptInput.value.trim();
-            if (!promptText) return;
-
-            // 獲取當前選擇的模型
-            const selectedModel = modelSelect.value;
-
-            // 生成當前對話的唯一ID
-            const currentMessageId = Date.now().toString();
-
-            // 顯示用戶訊息
-            addMessage(promptText, true);
-            // 添加到歷史記錄
-            addToHistory(promptText);
-            
-            // 添加用戶消息到對話歷史
-            conversationHistory.push({
-                role: "user",
-                content: promptText
-            });
-            
-            promptInput.value = '';
-            loading.classList.remove('hidden');
-            sendBtn.disabled = true;
-
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        prompt: promptText,
-                        model: selectedModel,
-                        conversation_history: conversationHistory // 發送完整對話歷史
-                    })
-                });
-
-                const reader = response.body.getReader();
-                let currentMessage = '';
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = new TextDecoder().decode(value);
-                    const lines = chunk.split('\n');
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const jsonResponse = JSON.parse(line.slice(5));
-                                if (jsonResponse.response) {
-                                    currentMessage += jsonResponse.response;
-                                    // 檢查是否已經有這次對話的助手回應
-                                    const currentAssistantMessage = Array.from(chatHistoryDiv.children).find(
-                                        msg => msg.dataset.messageId === currentMessageId
-                                    );
-
-                                    if (currentAssistantMessage) {
-                                        // 更新當前對話的回應
-                                        const contentDiv = currentAssistantMessage.querySelector('.prose');
-                                        contentDiv.innerHTML = formatTableText(currentMessage);
-                                    } else {
-                                        // 創建新的助手回應
-                                        const messageDiv = document.createElement('div');
-                                        messageDiv.className = 'flex items-start space-x-4 justify-start assistant-message';
-                                        messageDiv.dataset.messageId = currentMessageId;
-                                        const content = `
-                                            <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
-                                                <div class="prose">${formatTableText(currentMessage)}</div>
-                                                <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
-                                            </div>
-                                        `;
-                                        messageDiv.innerHTML = content;
-                                        chatHistoryDiv.appendChild(messageDiv);
-                                    }
-
-                                    // 滾動到底部
-                                    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
-                                }
-                            } catch (error) {
-                                console.error('解析回應時出錯:', error);
-                            }
-                        }
-                    }
-                }
-
-                // 在接收到回應後，將助手回應添加到對話歷史
-                conversationHistory.push({
-                    role: "assistant",
-                    content: currentMessage
-                });
-            } catch (error) {
-                console.error('發送請求時出錯:', error);
-            } finally {
-                loading.classList.add('hidden');
-                sendBtn.disabled = false;
-                promptInput.focus();
-            }
-        }
-
-        // 事件監聽器
-        sendBtn.addEventListener('click', sendMessage);
-        promptInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // 頁面載入時獲取模型列表
-        loadModels();
-
-        // 格式化時間
-        function formatTime() {
-            const now = new Date();
-            return now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        // 添加訊息到聊天記錄
-        function addMessage(text, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flex items-start space-x-4 ${isUser ? 'justify-end user-message' : 'justify-start assistant-message'}`;
-
-            const content = `
-                <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
-                    <div class="prose">${formatTableText(text)}</div>
-                    <div class="text-xs text-gray-500 mt-2 text-right">${formatTime()}</div>
-                </div>
-            `;
-
-            messageDiv.innerHTML = content;
-            chatHistoryDiv.appendChild(messageDiv);
-            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
-        }
-
-        // 保存當前對話
-        function saveChatHistory() {
-            const messages = chatHistoryDiv.innerHTML;
-            chatHistoryStore[currentChatId] = {
-                html: messages,
-                history: conversationHistory
-            };
-        }
-
-        // 載入特定對話
-        function loadChatHistory(chatId) {
-            if (chatHistoryStore[chatId]) {
-                chatHistoryDiv.innerHTML = chatHistoryStore[chatId].html;
-                conversationHistory = chatHistoryStore[chatId].history || [];
-                currentChatId = chatId;
-            }
-        }
-
-        // 創建新對話
-        function createNewChat() {
-            // 保存當前對話
-            saveChatHistory();
-
-            // 創建新的對話ID
-            currentChatId = Date.now().toString();
-            
-            // 重置對話歷史
-            conversationHistory = [];
-
-            // 清空聊天區域
-            chatHistoryDiv.innerHTML = `
-                <div class="flex items-start space-x-4 justify-start assistant-message">
-                    <div class="bg-gray-100 text-gray-700 p-4 rounded-lg shadow-sm max-w-2xl">
-                        <div class="prose">您好！我是 AI 助手，有什麼我可以幫您的嗎？</div>
-                        <div class="text-xs text-gray-500 mt-2 text-right"></div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // 添加到歷史記錄
-        function addToHistory(text) {
-            const historyItem = document.createElement('div');
-            historyItem.className = 'p-3 hover:bg-white/10 rounded-md cursor-pointer text-sm';
-            historyItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-            historyItem.dataset.chatId = currentChatId;
-
-            // 檢查是否已經存在相同的對話標籤
-            const existingItem = Array.from(historyList.children).find(
-                item => item.dataset.chatId === currentChatId
-            );
-
-            if (existingItem) {
-                // 更新現有標籤的文本
-                existingItem.textContent = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-            } else {
-                // 添加新的對話標籤
-                historyList.insertBefore(historyItem, historyList.firstChild);
-            }
-
-            // 添加點擊事件
-            historyItem.addEventListener('click', () => {
-                saveChatHistory();  // 保存當前對話
-                loadChatHistory(historyItem.dataset.chatId);  // 載入選中的對話
-            });
-        }
-
-        // 修改清除聊天的事件監聽器
-        newChatBtn.addEventListener('click', createNewChat);
-
-        // 複製程式碼函數
-        async function copyCode(wrapper) {
-            const codeElement = wrapper.querySelector('code');
-            try {
-                await navigator.clipboard.writeText(codeElement.textContent);
-                const button = wrapper.querySelector('.copy-code-button');
-                const originalText = button.innerHTML;
-                button.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                    </svg>
-                    已複製！
-                `;
-                setTimeout(() => {
-                    button.innerHTML = originalText;
-                }, 2000);
-            } catch (err) {
-                console.error('複製失敗:', err);
-            }
         }
     </script>
 </body>
